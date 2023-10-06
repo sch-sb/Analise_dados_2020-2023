@@ -1,0 +1,153 @@
+---
+title: "Untitled"
+author: "Sacha Saboia"
+date: "2023-10-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
+if (!require(pacman)) install.packages("pacman")
+knitr::opts_chunk$set(echo = FALSE, fig.cap = TRUE)
+pacman::p_load(tidyverse, httr, readxl, data.table, officer, downloader, lubridate, viridis, wordcloud, tidyr, flextable)
+
+
+
+
+rumores2023 <-  read_excel("C:/Users/sacha.carvalho/OneDrive - Ministério da Saúde/2023/Modelo Planilha de Detecção.xlsx", skip=1) %>%
+   drop_na(`Título do Rumor`)
+rumores2022 <- read_excel("D:/Dados 2020-2022/rumores 2022.xlsx")
+rumores2021 <- read_excel("D:/Dados 2020-2022/Quantitativo 2021.xlsx")
+rumores2020 <- read_excel("D:/Dados 2020-2022/rumores 2020.xlsx")
+rumores2023_1 <- read_excel("D:/Dados 2020-2022/rumores 2023.xlsx") %>%
+  rename(SE = ...2) %>%
+  drop_na(`...4`) %>%
+  filter(SE != "15")
+
+rumores2023$SE <- as.character(rumores2023$SE)
+
+r_2023 <- full_join(rumores2023_1, rumores2023, by = "SE")
+
+n2022<- rumores2022 %>%
+  drop_na(`Título`) %>%
+  group_by(`SE da detecção`) %>%
+  count()
+
+n2020 <- rumores2020 %>%
+    group_by(`SE`)%>%
+  count()
+
+n2021 <- rumores2021 %>%
+  select(`SE`, `rumores relevantes`)
+
+p_2023 <- r_2023 %>%
+  group_by(`Origem`, `...8`) %>%
+  count()
+    
+  n2023 <- r_2023 %>%
+    group_by(`SE`) %>%
+    count() 
+
+n2023 <- n2023[-c(41, 42), ] 
+
+
+n2023relev <- rumores2023 %>%
+  filter(`...67` %in% c("Aguardando resposta", "Respondido") | 
+         `...62` %in% c("Aguardando resposta", "Respondido") | 
+         `...51` %in% c("Aguardando resposta", "Respondido")) %>%
+  count()
+
+
+
+
+ serie_h <- data.frame(
+    ano = c(2020, 2021, 2022, 2023),
+    rumores_nacionais = c(1802, 3559, 3389, 198),
+    rumores_internacionais = c(1091, 2570, 2923, 165),
+    verificacoes = c(147, 299, 446, 363), 
+    CME=c(0, 667, 496, 82),
+    respondido=c(19, 89, 286, 94)
+)
+
+serie_h <- serie_h %>%
+  mutate(total_rumores = rumores_nacionais + rumores_internacionais)
+
+n2020$Ano <- 2020
+n2021$Ano <- 2021
+n2022$Ano <- 2022
+n2023$Ano <- 2023
+
+# Alterando nomes das colunas para serem consistentes entre os dataframes
+names(n2020) <- c("SE", "n", "Ano")
+names(n2021) <- c("SE", "n", "Ano")
+names(n2022) <- c("SE", "n", "Ano")
+names(n2023) <- c("SE", "n", "Ano")
+
+n2020$SE <- as.double(n2020$SE)
+n2021$SE <- as.double(n2021$SE)
+n2022$SE <- as.double(n2022$SE)
+n2023$SE <- as.double(n2023$SE)
+
+n2020$n <- as.integer(n2020$n)
+n2021$n <- as.integer(n2021$n)
+n2022$n <- as.integer(n2022$n)
+n2023$n <- as.integer(n2023$n)
+
+# Agora, tente combinar novamente:
+serie_temporal <- rbind(n2020, n2021, n2022, n2023)
+# Visualizando as primeiras linhas
+head(serie_temporal)
+
+
+serie_h_graf <- ggplot(serie_temporal, aes(x = SE, y = n, color = as.factor(Ano))) +
+  geom_line(aes(group = Ano), size = 1) +
+  labs(title = "Rumores Relevantes Detectados por Semana Epidemiológica",
+       x = "Semana Epidemiológica",
+       y = "Número de Rumores",
+       color = "Ano") +
+   ylim(0, 300) +
+  theme_classic()
+
+print(serie_h_graf)
+
+cores <- c("2020" = "#E69F00", "2021" = "#56B4E9", "2022" = "#009E73", "2023" = "#e74c3c")
+
+
+grafico_verificacoes <- ggplot(serie_h, aes(x = ano, y = verificacoes, fill = as.factor(ano))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = cores) +
+  labs(title = "Verificações por Ano", 
+       x = "Ano", 
+       y = "Número de Verificações",
+       fill = "Ano") +
+  theme_minimal()
+print(grafico_verificacoes)
+
+
+grafico_CME <- ggplot(serie_h, aes(x = ano, y = CME, fill = as.factor(ano))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = cores) +
+  labs(title = "CME por Ano", 
+       x = "Ano", 
+       y = "CME",
+       fill = "Ano") +
+  theme_classic()
+
+print(grafico_CME)
+
+
+
+
+tabela <- flextable( serie_h)
+
+# Inicie um novo documento Word
+doc <- read_docx()
+
+# Adicione a tabela ao documento
+doc <- body_add_flextable(doc, value = tabela)
+
+# Salve o documento
+print(doc, target = "serie_temporal.docx")
+```
+
